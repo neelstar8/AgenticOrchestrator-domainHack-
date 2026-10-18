@@ -1,0 +1,897 @@
+// ---------------------------------------------------------------------------
+// Sentinel — canonical relational data model.
+//
+// This schema is the single source of truth for the shape of Sentinel's data.
+// In demo mode the file-backed repository adapter (lib/repositories/file) uses
+// the same TypeScript types derived from these models, so the two adapters stay
+// structurally identical and the demo dataset is a faithful preview of the
+// relational one.
+//
+// Design notes that matter for correctness, not just tidiness:
+//
+//  * Every technical observation field is NULLABLE. A null `dnsStatus` means
+//    "not checked", which the UI renders as "Not checked" — never as a negative
+//    finding. See docs/limitations.md.
+//  * `origin` (DataOrigin) is carried on every evidence, relationship, match,
+//    scan and report row. Simulated demo records can therefore never be
+//    confused with records collected from a real external source.
+//  * Legal/official status is only ever reachable through an explicit human
+//    workflow action, never through a model or similarity score.
+// ---------------------------------------------------------------------------
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Prisma 7 moved the connection URL out of the schema file. See
+// prisma.config.ts, which reads DATABASE_URL for migrate/introspect commands.
+datasource db {
+  provider = "postgresql"
+}
+
+// ===========================================================================
+// Enums
+// ===========================================================================
+
+enum Role {
+  ADMINISTRATOR
+  INVESTIGATOR
+  REVIEWER
+  VIEWER
+}
+
+/// Whether a record was produced by the simulated demo provider or actually
+/// collected from a live external source. Mock providers can only emit
+/// SIMULATED_DEMO.
+enum DataOrigin {
+  SIMULATED_DEMO
+  LIVE_COLLECTED
+}
+
+enum ScanProfile {
+  QUICK
+  COMPREHENSIVE
+}
+
+enum ScanStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  COMPLETED_WITH_WARNINGS
+  FAILED
+  CANCELLED
+}
+
+enum DiscoveryScope {
+  SEARCH_INDEX
+  DOMAIN_VARIATIONS
+  CERTIFICATE_TRANSPARENCY
+  TECHNICAL_INSPECTION
+  REGULATORY_MATCHING
+  RELATED_DOMAIN_ANALYSIS
+}
+
+enum AgentKey {
+  WEB_DISCOVERY
+  DOMAIN_ENUMERATION
+  WEBSITE_INSPECTION
+  REGULATORY_VERIFICATION
+  RELATIONSHIP_ANALYSIS
+  EVIDENCE_REPORTING
+}
+
+enum TaskStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  COMPLETED_WITH_WARNINGS
+  FAILED
+  SKIPPED
+  CANCELLED
+}
+
+enum DiscoverySourceKind {
+  SEARCH_INDEX
+  DOMAIN_VARIATION
+  CERTIFICATE_TRANSPARENCY
+  PASSIVE_DNS
+  REGULATORY_DOCUMENT
+  REFERRAL_LINK
+  MANUAL_SUBMISSION
+}
+
+/// Result of an actual DNS resolution attempt. Null on the Domain record means
+/// no resolution has been attempted.
+enum DnsStatus {
+  RESOLVED
+  NXDOMAIN
+  SERVFAIL
+  TIMEOUT
+  CHECK_FAILED
+}
+
+enum ReviewStatus {
+  AWAITING_REVIEW
+  UNDER_REVIEW
+  NEEDS_MORE_EVIDENCE
+  ESCALATED
+  INCLUDED_IN_REPORT
+  NOT_RELATED
+  DISMISSED
+}
+
+enum Priority {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+  UNTRIAGED
+}
+
+/// Explicit epistemic label attached to every piece of evidence. Rendered
+/// verbatim in the UI and in exported reports.
+enum EvidenceKind {
+  OBSERVED_FACT
+  INFERRED_RELATIONSHIP
+  OFFICIAL_SOURCE_MATCH
+  REVIEWER_ASSESSMENT
+  UNVERIFIED_CLAIM
+}
+
+enum EvidenceCollectionMethod {
+  SIMULATED_DEMO_FIXTURE
+  SEARCH_PROVIDER
+  DNS_LOOKUP
+  HTTP_RESPONSE
+  TLS_CERTIFICATE
+  CERTIFICATE_TRANSPARENCY_LOG
+  REGULATORY_SOURCE_RETRIEVAL
+  LANGUAGE_MODEL_INFERENCE
+  CORRELATION_ANALYSIS
+  HUMAN_REVIEW
+}
+
+enum RelationshipType {
+  REDIRECTS_TO
+  SHARES_CERTIFICATE_CHARACTERISTIC
+  SIMILAR_WEBSITE_CONTENT
+  APPEARS_IN_SAME_OFFICIAL_REPORT
+  SUSPECTED_BRAND_RELATIONSHIP
+  CONFIRMED_RELATIONSHIP
+}
+
+enum RegulatorySourceType {
+  INVESTOR_WARNING_LIST
+  AUTHORISED_ENTITY_REGISTER
+  PRESS_RELEASE
+  CIRCULAR_OR_NOTIFICATION
+  ENFORCEMENT_ORDER
+  PUBLIC_ADVISORY
+  OTHER_OFFICIAL_PUBLICATION
+}
+
+enum RetrievalStatus {
+  NEVER_CHECKED
+  OK
+  STALE
+  UNREACHABLE
+  HTTP_ERROR
+  PARSE_ERROR
+  BLOCKED_BY_SOURCE
+  DISABLED
+}
+
+enum MatchType {
+  EXACT_DOMAIN
+  EXACT_ENTITY_NAME
+  PARTIAL_ENTITY_NAME
+  BRAND_TOKEN
+  CONTEXTUAL_MENTION
+}
+
+enum ReportStatus {
+  DRAFT
+  AWAITING_REVIEW
+  APPROVED
+  SUBMITTED
+  RESPONSE_RECEIVED
+  ACTION_CONFIRMED
+  CLOSED
+}
+
+enum ReceivingAuthority {
+  SEBI
+  RBI
+  CERT_IN
+  MEITY_I4C
+  LAW_ENFORCEMENT
+  INTERNAL_RECORD_ONLY
+  OTHER
+}
+
+enum AuditAction {
+  USER_SIGNED_IN
+  USER_SIGNED_OUT
+  SCAN_CREATED
+  SCAN_CANCELLED
+  SCAN_COMPLETED
+  SCAN_FAILED
+  AGENT_TASK_STARTED
+  AGENT_TASK_COMPLETED
+  AGENT_TASK_FAILED
+  AGENT_TASK_RETRIED
+  DOMAIN_DISCOVERED
+  DOMAIN_UPDATED
+  EVIDENCE_ADDED
+  REVIEW_STATUS_CHANGED
+  REVIEWER_ASSIGNED
+  RELATIONSHIP_RECORDED
+  REGULATORY_SOURCE_CREATED
+  REGULATORY_SOURCE_UPDATED
+  REGULATORY_SOURCE_CHECKED
+  REGULATORY_MATCH_RECORDED
+  REPORT_CREATED
+  REPORT_UPDATED
+  REPORT_GENERATED
+  REPORT_SUBMITTED_FOR_REVIEW
+  REPORT_APPROVED
+  REPORT_EXPORTED
+  SUBMISSION_REFERENCE_RECORDED
+  AUTHORITY_RESPONSE_RECORDED
+  OFFICIAL_OUTCOME_RECORDED
+  REPORT_CLOSED
+  SETTING_UPDATED
+  DEMO_DATA_RESET
+}
+
+enum AuditEntityType {
+  USER
+  SCAN
+  AGENT_TASK
+  DOMAIN
+  EVIDENCE
+  DOMAIN_RELATIONSHIP
+  REGULATORY_SOURCE
+  REGULATORY_MATCH
+  REPORT
+  APPLICATION_SETTING
+  SYSTEM
+}
+
+enum SettingCategory {
+  APPLICATION
+  MODE
+  AGENTS
+  PROVIDERS
+  SCAN_LIMITS
+  RATE_LIMITING
+  EVIDENCE_RETENTION
+  REPORT_DEFAULTS
+  APPEARANCE
+}
+
+// ===========================================================================
+// Identity
+// ===========================================================================
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  role         Role     @default(VIEWER)
+  /// bcrypt hash. Never returned by any API response.
+  passwordHash String
+  jobTitle     String?
+  isActive     Boolean  @default(true)
+  isDemoUser   Boolean  @default(false)
+  lastLoginAt  DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  initiatedScans    Scan[]                  @relation("ScanInitiatedBy")
+  assignedDomains   Domain[]                @relation("DomainAssignedReviewer")
+  createdEvidence   Evidence[]              @relation("EvidenceCreatedBy")
+  preparedReports   Report[]                @relation("ReportPreparedBy")
+  approvedReports   Report[]                @relation("ReportApprovedBy")
+  auditEvents       AuditEvent[]
+  triggeredChecks   RegulatorySourceCheck[]
+  confirmedMatches  RegulatoryMatch[]
+  updatedSettings   ApplicationSetting[]
+
+  @@index([role])
+  @@index([isActive])
+}
+
+// ===========================================================================
+// Platforms and discovery sources
+// ===========================================================================
+
+model Platform {
+  id              String   @id @default(cuid())
+  name            String   @unique
+  slug            String   @unique
+  /// Alternative brand spellings and trading names seen in evidence.
+  aliases         String[] @default([])
+  /// Human-readable investigation identifier, e.g. SNT-DEMO-2026-0147.
+  investigationId String?  @unique
+  description     String?
+  origin          DataOrigin @default(SIMULATED_DEMO)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  seededDomains Domain[]         @relation("DomainSeedPlatform")
+  domainLinks   DomainPlatform[]
+  scans         Scan[]
+
+  @@index([origin])
+}
+
+model DiscoverySource {
+  id          String              @id @default(cuid())
+  key         String              @unique
+  name        String
+  kind        DiscoverySourceKind
+  description String
+  isEnabled   Boolean             @default(true)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  domainLinks DomainDiscoverySource[]
+
+  @@index([kind])
+}
+
+// ===========================================================================
+// Scans and agent tasks
+// ===========================================================================
+
+model Scan {
+  id        String @id @default(cuid())
+  reference String @unique
+
+  platformId        String?
+  /// Raw brand/platform text the operator typed, preserved verbatim.
+  platformNameInput String
+  seedDomain        String?
+  notes             String?
+
+  profile       ScanProfile      @default(QUICK)
+  scopes        DiscoveryScope[] @default([])
+  maxCandidates Int              @default(50)
+
+  status     ScanStatus @default(QUEUED)
+  origin     DataOrigin @default(SIMULATED_DEMO)
+
+  initiatedById String
+
+  queuedAt    DateTime  @default(now())
+  startedAt   DateTime?
+  completedAt DateTime?
+  cancelledAt DateTime?
+  durationMs  Int?
+
+  candidatesFound           Int @default(0)
+  candidatesRequiringReview Int @default(0)
+  warningCount              Int @default(0)
+
+  errorMessage String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  platform        Platform?  @relation(fields: [platformId], references: [id], onDelete: SetNull)
+  initiatedBy     User       @relation("ScanInitiatedBy", fields: [initiatedById], references: [id], onDelete: Restrict)
+  tasks           AgentTask[]
+  discoveredDomains Domain[] @relation("DomainDiscoveredByScan")
+  evidence        Evidence[]
+
+  @@index([status])
+  @@index([platformId])
+  @@index([initiatedById])
+  @@index([queuedAt])
+  @@index([origin])
+}
+
+model AgentTask {
+  id       String @id @default(cuid())
+  scanId   String
+  agentKey AgentKey
+  /// Position in the orchestrated pipeline (1-based, stable per scan).
+  sequence Int
+  title    String
+
+  status      TaskStatus @default(PENDING)
+  attempt     Int        @default(0)
+  maxAttempts Int        @default(2)
+
+  startedAt   DateTime?
+  completedAt DateTime?
+  durationMs  Int?
+
+  inputSummary  String?
+  outputSummary String?
+  /// Counts the agent reported, e.g. { "candidatesReturned": 12 }.
+  metrics       Json?
+  errorMessage  String?
+  /// True when the task succeeded but reported non-fatal problems.
+  hasWarnings   Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  scan     Scan       @relation(fields: [scanId], references: [id], onDelete: Cascade)
+  evidence Evidence[]
+
+  @@unique([scanId, sequence])
+  @@index([scanId, status])
+  @@index([agentKey])
+}
+
+// ===========================================================================
+// Domains
+// ===========================================================================
+
+model Domain {
+  id String @id @default(cuid())
+
+  /// Fully qualified domain name exactly as discovered, lowercased.
+  fqdn String @unique
+  /// Punycode-normalised, trailing-dot-stripped form used for deduplication.
+  normalizedDomain String
+  /// Registrable domain (eTLD+1) when derivable.
+  registrableDomain String
+  /// Public suffix, e.g. "com", "com.in".
+  suffix String
+
+  seedPlatformId  String?
+  associatedNames String[] @default([])
+
+  firstSeenAt DateTime
+  lastSeenAt  DateTime
+
+  // --- Technical observations. NULL everywhere means "not checked". --------
+  lastCheckedAt DateTime?
+
+  dnsStatus    DnsStatus?
+  dnsCheckedAt DateTime?
+  resolvedIpCount Int?
+
+  httpStatusCode Int?
+  httpCheckedAt  DateTime?
+
+  /// Only set when a redirect was actually observed.
+  redirectsToUrl     String?
+  redirectObservedAt DateTime?
+
+  certIssuer            String?
+  certSubjectCommonName String?
+  certNotBefore         DateTime?
+  certNotAfter          DateTime?
+  certFingerprintSha256 String?
+  certObservedAt        DateTime?
+
+  siteTitle            String?
+  siteDescription      String?
+  siteLanguage         String?
+  detectedTechnologies String[] @default([])
+  observedAt           DateTime?
+
+  // --- Investigative signals (NOT determinations) -------------------------
+  brandSimilarityScore   Int?
+  contentSimilarityScore Int?
+  similarityRationale    String?
+
+  /// 0-100, derived from which evidence categories are present.
+  evidenceCompleteness Int @default(0)
+
+  // --- Human review -------------------------------------------------------
+  reviewStatus       ReviewStatus @default(AWAITING_REVIEW)
+  priority           Priority     @default(UNTRIAGED)
+  assignedReviewerId String?
+  reviewerNotes      String?
+  reviewedAt         DateTime?
+
+  origin             DataOrigin @default(SIMULATED_DEMO)
+  discoveredByScanId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  seedPlatform     Platform? @relation("DomainSeedPlatform", fields: [seedPlatformId], references: [id], onDelete: SetNull)
+  assignedReviewer User?     @relation("DomainAssignedReviewer", fields: [assignedReviewerId], references: [id], onDelete: SetNull)
+  discoveredByScan Scan?     @relation("DomainDiscoveredByScan", fields: [discoveredByScanId], references: [id], onDelete: SetNull)
+
+  platformLinks        DomainPlatform[]
+  discoverySourceLinks DomainDiscoverySource[]
+  evidence             Evidence[]
+  outgoingRelationships DomainRelationship[] @relation("RelationshipSource")
+  incomingRelationships DomainRelationship[] @relation("RelationshipTarget")
+  regulatoryMatches    RegulatoryMatch[]
+  reportLinks          ReportDomain[]
+
+  @@index([normalizedDomain])
+  @@index([registrableDomain])
+  @@index([suffix])
+  @@index([reviewStatus])
+  @@index([priority])
+  @@index([seedPlatformId])
+  @@index([firstSeenAt])
+  @@index([origin])
+  @@index([discoveredByScanId])
+}
+
+model DomainPlatform {
+  domainId   String
+  platformId String
+  /// Why this domain is linked to this platform, in plain language.
+  rationale  String
+  /// 0-100 investigative confidence. Never a legal determination.
+  confidence Int        @default(0)
+  origin     DataOrigin @default(SIMULATED_DEMO)
+  createdAt  DateTime   @default(now())
+
+  domain   Domain   @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  platform Platform @relation(fields: [platformId], references: [id], onDelete: Cascade)
+
+  @@id([domainId, platformId])
+  @@index([platformId])
+}
+
+model DomainDiscoverySource {
+  domainId          String
+  discoverySourceId String
+  firstSeenAt       DateTime
+  lastSeenAt        DateTime
+  detail            String?
+  origin            DataOrigin @default(SIMULATED_DEMO)
+
+  domain          Domain          @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  discoverySource DiscoverySource @relation(fields: [discoverySourceId], references: [id], onDelete: Cascade)
+
+  @@id([domainId, discoverySourceId])
+  @@index([discoverySourceId])
+}
+
+// ===========================================================================
+// Evidence
+// ===========================================================================
+
+model Evidence {
+  id String @id @default(cuid())
+
+  domainId    String?
+  scanId      String?
+  agentTaskId String?
+
+  /// The epistemic label. Rendered verbatim in the UI and in exports.
+  kind        EvidenceKind
+  title       String
+  description String
+
+  sourceUrl   String?
+  sourceLabel String?
+
+  collectedAt      DateTime
+  collectionMethod EvidenceCollectionMethod
+
+  /// 0-100 where meaningful. Null for plain observed facts.
+  confidence Int?
+
+  /// Caveats a reader must see alongside this item.
+  limitations String?
+
+  origin DataOrigin @default(SIMULATED_DEMO)
+
+  /// Structured payload preserved exactly as returned by the provider.
+  rawReference Json?
+
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  domain       Domain?    @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  scan         Scan?      @relation(fields: [scanId], references: [id], onDelete: SetNull)
+  agentTask    AgentTask? @relation(fields: [agentTaskId], references: [id], onDelete: SetNull)
+  createdBy    User?      @relation("EvidenceCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  relationships DomainRelationship[]
+  reportLinks  ReportEvidence[]
+
+  @@index([domainId])
+  @@index([scanId])
+  @@index([kind])
+  @@index([collectedAt])
+  @@index([origin])
+}
+
+// ===========================================================================
+// Relationships
+// ===========================================================================
+
+model DomainRelationship {
+  id             String @id @default(cuid())
+  sourceDomainId String
+  targetDomainId String
+
+  type       RelationshipType
+  /// 0-100 investigative confidence.
+  confidence Int              @default(0)
+  /// Plain-language explanation of the signals behind the edge.
+  rationale  String
+  /// What this relationship does NOT establish. Required: a shared host, IP or
+  /// certificate characteristic alone never implies shared ownership.
+  limitations String
+
+  relationSource  String
+  firstObservedAt DateTime
+  lastObservedAt  DateTime
+
+  /// True only when a human reviewer confirmed it against evidence.
+  reviewerConfirmed   Boolean @default(false)
+  reviewerConfirmedAt DateTime?
+
+  origin     DataOrigin @default(SIMULATED_DEMO)
+  evidenceId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sourceDomain Domain    @relation("RelationshipSource", fields: [sourceDomainId], references: [id], onDelete: Cascade)
+  targetDomain Domain    @relation("RelationshipTarget", fields: [targetDomainId], references: [id], onDelete: Cascade)
+  evidence     Evidence? @relation(fields: [evidenceId], references: [id], onDelete: SetNull)
+
+  @@unique([sourceDomainId, targetDomainId, type])
+  @@index([type])
+  @@index([sourceDomainId])
+  @@index([targetDomainId])
+  @@index([origin])
+}
+
+// ===========================================================================
+// Regulatory sources
+// ===========================================================================
+
+model RegulatorySource {
+  id                 String               @id @default(cuid())
+  authorityName      String
+  authorityShortName String
+  title              String
+  /// Official URL as configured by an administrator.
+  sourceUrl          String
+  sourceType         RegulatorySourceType
+  description        String?
+
+  isEnabled          Boolean @default(true)
+  checkIntervalHours Int     @default(24)
+
+  lastCheckAttemptAt    DateTime?
+  lastSuccessfulCheckAt DateTime?
+  /// Last-Modified / published date reported BY THE SOURCE, when available.
+  lastModifiedReported  DateTime?
+
+  retrievalStatus RetrievalStatus @default(NEVER_CHECKED)
+  retrievalError  String?
+
+  matchedEntityCount Int @default(0)
+
+  verificationNotes String?
+
+  /// SIMULATED_DEMO for illustrative fixtures; LIVE_COLLECTED only once a real
+  /// retrieval has actually succeeded against the configured URL.
+  origin DataOrigin @default(SIMULATED_DEMO)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  checks  RegulatorySourceCheck[]
+  matches RegulatoryMatch[]
+
+  @@unique([authorityShortName, sourceUrl])
+  @@index([sourceType])
+  @@index([retrievalStatus])
+  @@index([isEnabled])
+}
+
+model RegulatorySourceCheck {
+  id                 String @id @default(cuid())
+  regulatorySourceId String
+
+  startedAt   DateTime
+  completedAt DateTime?
+
+  status         RetrievalStatus
+  httpStatusCode Int?
+  bytesRetrieved Int?
+
+  matchedEntityCount Int @default(0)
+  errorMessage       String?
+  note               String?
+
+  origin          DataOrigin @default(SIMULATED_DEMO)
+  triggeredById   String?
+
+  createdAt DateTime @default(now())
+
+  regulatorySource RegulatorySource  @relation(fields: [regulatorySourceId], references: [id], onDelete: Cascade)
+  triggeredBy      User?             @relation(fields: [triggeredById], references: [id], onDelete: SetNull)
+  matches          RegulatoryMatch[]
+
+  @@index([regulatorySourceId, startedAt])
+  @@index([status])
+}
+
+model RegulatoryMatch {
+  id                      String  @id @default(cuid())
+  regulatorySourceId      String
+  regulatorySourceCheckId String?
+  domainId                String?
+
+  matchedTerm    String
+  /// Surrounding text from the source document supporting the match.
+  matchedContext String
+  matchType      MatchType
+  confidence     Int       @default(0)
+
+  /// URL and retrieval time of the source record this match came from.
+  sourceUrl         String
+  sourceRetrievedAt DateTime
+
+  /// A match is an investigative signal. Only a reviewer can confirm it.
+  reviewerConfirmed     Boolean   @default(false)
+  reviewerConfirmedById String?
+  reviewerConfirmedAt   DateTime?
+  notes                 String?
+
+  origin DataOrigin @default(SIMULATED_DEMO)
+
+  createdAt DateTime @default(now())
+
+  regulatorySource      RegulatorySource       @relation(fields: [regulatorySourceId], references: [id], onDelete: Cascade)
+  regulatorySourceCheck RegulatorySourceCheck? @relation(fields: [regulatorySourceCheckId], references: [id], onDelete: SetNull)
+  domain                Domain?                @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  reviewerConfirmedBy   User?                  @relation(fields: [reviewerConfirmedById], references: [id], onDelete: SetNull)
+
+  @@index([regulatorySourceId])
+  @@index([domainId])
+  @@index([matchType])
+  @@index([origin])
+}
+
+// ===========================================================================
+// Reports
+// ===========================================================================
+
+model Report {
+  id        String @id @default(cuid())
+  reference String @unique
+
+  title  String
+  status ReportStatus @default(DRAFT)
+
+  receivingAuthority ReceivingAuthority @default(INTERNAL_RECORD_ONLY)
+  authorityOther     String?
+
+  executiveSummary String
+  findings         String
+  recommendations  String
+  /// Required. What the evidence does not establish.
+  limitations      String
+  methodology      String
+
+  preparedById String
+  approvedById String?
+  approvedAt   DateTime?
+
+  submittedAt         DateTime?
+  /// Manually recorded by a human after submitting out-of-band.
+  submissionReference String?
+  submissionChannel   String?
+
+  responseReceivedAt DateTime?
+  responseSummary    String?
+
+  outcomeConfirmedAt DateTime?
+  outcomeSummary     String?
+
+  closedAt   DateTime?
+  closingNote String?
+
+  origin DataOrigin @default(SIMULATED_DEMO)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  preparedBy User?            @relation("ReportPreparedBy", fields: [preparedById], references: [id], onDelete: Restrict)
+  approvedBy User?            @relation("ReportApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  domainLinks   ReportDomain[]
+  evidenceLinks ReportEvidence[]
+
+  @@index([status])
+  @@index([preparedById])
+  @@index([receivingAuthority])
+  @@index([createdAt])
+}
+
+model ReportDomain {
+  reportId          String
+  domainId          String
+  includedRationale String?
+  orderIndex        Int     @default(0)
+
+  report Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  domain Domain @relation(fields: [domainId], references: [id], onDelete: Cascade)
+
+  @@id([reportId, domainId])
+  @@index([domainId])
+}
+
+model ReportEvidence {
+  reportId   String
+  evidenceId String
+  orderIndex Int    @default(0)
+
+  report   Report   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  evidence Evidence @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+
+  @@id([reportId, evidenceId])
+  @@index([evidenceId])
+}
+
+// ===========================================================================
+// Audit
+// ===========================================================================
+
+/// Append-only in application terms: the repository layer exposes no update or
+/// delete operation for this model, and the deployment checklist shows how to
+/// revoke UPDATE/DELETE at the database role level. Sentinel makes NO claim of
+/// cryptographic immutability — see docs/limitations.md.
+model AuditEvent {
+  id         String @id @default(cuid())
+  occurredAt DateTime @default(now())
+
+  actorId    String?
+  /// Denormalised actor label so the event stays readable if a user is removed.
+  actorLabel String
+
+  action     AuditAction
+  entityType AuditEntityType
+  entityId   String
+  entityLabel String?
+
+  previousState Json?
+  newState      Json?
+
+  reason    String?
+  requestId String?
+
+  createdAt DateTime @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([occurredAt])
+  @@index([actorId])
+  @@index([action])
+  @@index([entityType, entityId])
+}
+
+// ===========================================================================
+// Settings
+// ===========================================================================
+
+model ApplicationSetting {
+  key         String          @id
+  category    SettingCategory
+  label       String
+  description String
+  value       Json
+  /// Secret settings are configured through server environment variables only.
+  /// Their values are never returned to the browser.
+  isSecret    Boolean         @default(false)
+  isEditable  Boolean         @default(true)
+
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  updatedBy User? @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@index([category])
+}

@@ -39,3 +39,18 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Sentinel local demo persistence (file-backed repository adapter)
+/.data/
+
+# Playwright
+/playwright-report/
+/test-results/
+/blob-report/
+/.playwright/
+
+# Vitest
+/coverage/
+
+# Generated Prisma client
+/node_modules/.prisma/

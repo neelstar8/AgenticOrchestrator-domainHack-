@@ -1,26 +1,354 @@
 @import "tailwindcss";
 
+/*
+ * Sentinel design system.
+ *
+ * Dark graphite and deep navy surfaces with a restrained blue accent. Colour
+ * carries meaning here rather than decoration:
+ *
+ *   verified  (green)  — something was observed, checked or confirmed
+ *   review    (amber)  — awaiting a human judgement
+ *   critical  (red)    — reserved for a genuine high-priority finding or a
+ *                        failure. Deliberately rare, so it keeps its weight.
+ *   info      (blue)   — the product accent, and the marker for simulated data
+ *   muted     (slate)  — "not checked", dismissed, or not applicable
+ *
+ * Every token is defined on bare `:root` first, then overridden under `.dark`,
+ * so the next-themes toggle works in both directions and nothing has its only
+ * definition inside a conditional block.
+ */
+
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Light theme: paper-white surfaces, same semantic roles. */
+  --background: oklch(0.985 0.002 250);
+  --surface: oklch(1 0 0);
+  --surface-raised: oklch(0.995 0.002 250);
+  --surface-sunken: oklch(0.965 0.004 250);
+  --surface-hover: oklch(0.955 0.006 250);
+  --panel: oklch(0.975 0.006 255);
+
+  --foreground: oklch(0.21 0.02 255);
+  --foreground-muted: oklch(0.47 0.015 255);
+  --foreground-subtle: oklch(0.6 0.012 255);
+
+  --border: oklch(0.9 0.006 255);
+  --border-strong: oklch(0.83 0.01 255);
+  --ring: oklch(0.55 0.15 250);
+
+  --accent: oklch(0.52 0.16 253);
+  --accent-hover: oklch(0.46 0.17 253);
+  --accent-foreground: oklch(0.99 0 0);
+  --accent-subtle: oklch(0.94 0.03 253);
+  --accent-subtle-foreground: oklch(0.38 0.14 253);
+
+  --verified: oklch(0.56 0.13 155);
+  --verified-subtle: oklch(0.94 0.04 155);
+  --verified-foreground: oklch(0.34 0.1 155);
+
+  --review: oklch(0.68 0.14 75);
+  --review-subtle: oklch(0.95 0.05 85);
+  --review-foreground: oklch(0.42 0.11 70);
+
+  --critical: oklch(0.56 0.19 25);
+  --critical-subtle: oklch(0.95 0.04 25);
+  --critical-foreground: oklch(0.42 0.17 25);
+
+  --muted: oklch(0.6 0.012 255);
+  --muted-subtle: oklch(0.95 0.004 255);
+  --muted-foreground: oklch(0.45 0.012 255);
+
+  --chart-1: oklch(0.55 0.16 253);
+  --chart-2: oklch(0.6 0.13 190);
+  --chart-3: oklch(0.6 0.13 155);
+  --chart-4: oklch(0.7 0.14 80);
+  --chart-5: oklch(0.6 0.18 25);
+  --chart-6: oklch(0.55 0.16 300);
+  --chart-grid: oklch(0.9 0.006 255);
+
+  --radius: 0.375rem;
+}
+
+/* Dark is the product's default. */
+:root.dark,
+.dark {
+  --background: oklch(0.155 0.008 255);
+  --surface: oklch(0.19 0.01 255);
+  --surface-raised: oklch(0.225 0.012 255);
+  --surface-sunken: oklch(0.135 0.008 255);
+  --surface-hover: oklch(0.255 0.014 255);
+  --panel: oklch(0.205 0.018 258);
+
+  --foreground: oklch(0.95 0.004 255);
+  --foreground-muted: oklch(0.73 0.01 255);
+  --foreground-subtle: oklch(0.6 0.012 255);
+
+  --border: oklch(0.28 0.012 255);
+  --border-strong: oklch(0.36 0.016 255);
+  --ring: oklch(0.65 0.15 250);
+
+  --accent: oklch(0.63 0.16 253);
+  --accent-hover: oklch(0.69 0.16 253);
+  --accent-foreground: oklch(0.14 0.01 255);
+  --accent-subtle: oklch(0.27 0.055 253);
+  --accent-subtle-foreground: oklch(0.82 0.1 253);
+
+  --verified: oklch(0.68 0.14 155);
+  --verified-subtle: oklch(0.26 0.05 155);
+  --verified-foreground: oklch(0.84 0.11 155);
+
+  --review: oklch(0.78 0.14 80);
+  --review-subtle: oklch(0.28 0.055 75);
+  --review-foreground: oklch(0.88 0.11 85);
+
+  --critical: oklch(0.65 0.19 25);
+  --critical-subtle: oklch(0.28 0.07 25);
+  --critical-foreground: oklch(0.86 0.1 25);
+
+  --muted: oklch(0.55 0.012 255);
+  --muted-subtle: oklch(0.24 0.01 255);
+  --muted-foreground: oklch(0.68 0.01 255);
+
+  --chart-1: oklch(0.66 0.16 253);
+  --chart-2: oklch(0.7 0.13 190);
+  --chart-3: oklch(0.7 0.13 155);
+  --chart-4: oklch(0.78 0.14 80);
+  --chart-5: oklch(0.67 0.18 25);
+  --chart-6: oklch(0.68 0.16 300);
+  --chart-grid: oklch(0.28 0.012 255);
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-surface-hover: var(--surface-hover);
+  --color-panel: var(--panel);
+
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-foreground-muted: var(--foreground-muted);
+  --color-foreground-subtle: var(--foreground-subtle);
+
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-ring: var(--ring);
+
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent-subtle: var(--accent-subtle);
+  --color-accent-subtle-foreground: var(--accent-subtle-foreground);
+
+  --color-verified: var(--verified);
+  --color-verified-subtle: var(--verified-subtle);
+  --color-verified-foreground: var(--verified-foreground);
+
+  --color-review: var(--review);
+  --color-review-subtle: var(--review-subtle);
+  --color-review-foreground: var(--review-foreground);
+
+  --color-critical: var(--critical);
+  --color-critical-subtle: var(--critical-subtle);
+  --color-critical-foreground: var(--critical-foreground);
+
+  --color-muted: var(--muted);
+  --color-muted-subtle: var(--muted-subtle);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-chart-6: var(--chart-6);
+  --color-chart-grid: var(--chart-grid);
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* Small radii throughout: this is an instrument, not a consumer app. */
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+
+  --animate-fade-in: fade-in 0.18s ease-out;
+  --animate-slide-up: slide-up 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-pulse-soft: pulse-soft 2s ease-in-out infinite;
+  --animate-sweep: sweep 2.4s linear infinite;
+  --animate-shimmer: shimmer 1.6s ease-in-out infinite;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse-soft {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@keyframes sweep {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 0.45;
+  }
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  html {
+    /* Set explicitly so the viewer's chrome does not show through. */
+    background-color: var(--background);
+    color-scheme: light;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* One consistent focus treatment everywhere, including keyboard-only. */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+
+  /* Tabular figures keep dense numeric tables aligned. */
+  th,
+  td {
+    font-variant-numeric: tabular-nums;
+  }
+
+  ::selection {
+    background-color: var(--accent-subtle);
+    color: var(--accent-subtle-foreground);
+  }
+
+  /* Slim scrollbars so dense panels do not lose width to chrome. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background-color: var(--border-strong);
+    border-radius: 9999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: var(--foreground-subtle);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  /* Skip link, visible only when focused. */
+  .skip-link {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    z-index: 100;
+  }
+
+  .skip-link:focus {
+    left: 0.75rem;
+    top: 0.75rem;
+    padding: 0.5rem 0.875rem;
+    background-color: var(--accent);
+    color: var(--accent-foreground);
+    border-radius: var(--radius-md);
+    font-size: 0.8125rem;
+    font-weight: 500;
+  }
+
+  /*
+   * Wide content — investigative tables, the relationship graph, code blocks —
+   * scrolls inside its own container. The page body must never scroll
+   * horizontally.
+   */
+  .scroll-x {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+  }
+
+  /* The faint diagonal hatch that marks simulated-data regions. */
+  .simulated-hatch {
+    background-image: repeating-linear-gradient(
+      45deg,
+      transparent,
+      transparent 6px,
+      var(--accent-subtle) 6px,
+      var(--accent-subtle) 7px
+    );
+  }
 }
