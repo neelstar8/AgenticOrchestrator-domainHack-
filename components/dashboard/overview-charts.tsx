@@ -220,8 +220,9 @@ export function OverviewCharts({ metrics }: { metrics: OverviewMetrics }) {
                       paddingAngle={2}
                       strokeWidth={1}
                       stroke="var(--color-surface)"
-                      onClick={(entry: { status?: string }) => {
-                        if (entry.status) router.push(`/domains?reviewStatus=${entry.status}`);
+                      onClick={(entry: unknown) => {
+                        const status = (entry as { status?: string } | undefined)?.status;
+                        if (status) router.push(`/domains?reviewStatus=${status}`);
                       }}
                       className="cursor-pointer outline-none"
                     >
@@ -311,9 +312,10 @@ export function OverviewCharts({ metrics }: { metrics: OverviewMetrics }) {
                   radius={[0, 3, 3, 0]}
                   barSize={14}
                   className="cursor-pointer"
-                  onClick={(entry: { key?: string }) => {
-                    if (entry.key) router.push(`/domains?discoverySourceKey=${entry.key}`);
-                  }}
+                  onClick={((entry: unknown) => {
+                    const key = (entry as { key?: string } | undefined)?.key;
+                    if (key) router.push(`/domains?discoverySourceKey=${key}`);
+                  }) as never}
                 >
                   {sources.map((entry, index) => (
                     <Cell key={entry.key} fill={CHART_COLORS[index % CHART_COLORS.length]} />
@@ -413,13 +415,14 @@ export function OverviewCharts({ metrics }: { metrics: OverviewMetrics }) {
                 name="Domains"
                 radius={[3, 3, 0, 0]}
                 className="cursor-pointer"
-                onClick={(entry: { min?: number; max?: number }) => {
-                  if (entry.min !== undefined && entry.max !== undefined) {
+                onClick={((entry: unknown) => {
+                  const bucket = entry as { min?: number; max?: number } | undefined;
+                  if (bucket?.min !== undefined && bucket.max !== undefined) {
                     router.push(
-                      `/domains?minEvidenceCompleteness=${entry.min}&maxEvidenceCompleteness=${entry.max}`,
+                      `/domains?minEvidenceCompleteness=${bucket.min}&maxEvidenceCompleteness=${bucket.max}`,
                     );
                   }
-                }}
+                }) as never}
               >
                 {metrics.evidenceCompleteness.buckets.map((bucket, index) => (
                   <Cell

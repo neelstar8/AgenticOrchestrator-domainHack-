@@ -293,7 +293,7 @@ async function fetchJson<T>(url: string, signal: AbortSignal): Promise<T | null>
     "ok" in payload &&
     (payload as { ok: boolean }).ok
   ) {
-    return (payload as { data: T }).data;
+    return (payload as unknown as { data: T }).data;
   }
   return null;
 }

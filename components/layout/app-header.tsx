@@ -24,7 +24,6 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/toast";
 import { RoleBadge } from "@/components/shared/badges";
-import { RelativeTime } from "@/components/shared/relative-time";
 import { cn } from "@/lib/utils/cn";
 import type { Role } from "@/lib/types/enums";
 import type { ScanListItem } from "@/lib/types/views";

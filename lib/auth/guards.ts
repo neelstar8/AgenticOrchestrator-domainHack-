@@ -46,15 +46,29 @@ export class ForbiddenError extends Error {
 }
 
 /**
- * Resolves the current user, or null.
+ * The serialisable part of a resolved session.
  *
- * `'use cache: private'` keeps the resolved user in the browser's private
- * cache for the Cache Components lifetime, so a navigation does not re-read
- * the cookie and re-query the repository. Nothing is cached on the server, and
- * a redirect throws rather than returning, so only a resolved user is ever
- * cached. See the Next.js authentication-with-cache-components guide.
+ * Kept separate from `AuthenticatedUser` because a `use cache` scope can only
+ * return serialisable values — a method on the object would be rejected. The
+ * `can` helper is therefore attached outside the cache boundary.
  */
-export async function getCurrentUser(): Promise<AuthenticatedUser | null> {
+interface CachedSessionUser {
+  user: User;
+  permissions: readonly Permission[];
+  sessionId: string;
+  isDevelopmentSession: boolean;
+}
+
+/**
+ * Reads and validates the session, returning a plain object.
+ *
+ * `'use cache: private'` keeps the result in the browser's private cache for
+ * the Cache Components lifetime, so a navigation does not re-read the cookie
+ * and re-query the repository. Nothing is cached on the server, and a redirect
+ * throws rather than returning, so only a resolved user is ever cached. See
+ * the Next.js authentication-with-cache-components guide.
+ */
+async function getCachedSessionUser(): Promise<CachedSessionUser | null> {
   "use cache: private";
 
   const session = await readActiveSession();
@@ -66,16 +80,24 @@ export async function getCurrentUser(): Promise<AuthenticatedUser | null> {
   // A session for a removed or deactivated account is not a session.
   if (!user || !user.isActive) return null;
 
-  // The role is re-read from the stored user, not taken from the cookie, so a
-  // role change takes effect on the next request rather than at next login.
-  const permissions = permissionsFor(user.role);
-
   return {
     user,
-    permissions,
+    // The role is re-read from the stored user rather than taken from the
+    // cookie, so a role change takes effect on the next request.
+    permissions: permissionsFor(user.role),
     sessionId: session.sessionId,
     isDevelopmentSession: isDevelopmentSessionSecret(),
-    can: (permission: Permission) => hasPermission(user.role, permission),
+  };
+}
+
+/** Resolves the current user, or null. */
+export async function getCurrentUser(): Promise<AuthenticatedUser | null> {
+  const cached = await getCachedSessionUser();
+  if (!cached) return null;
+
+  return {
+    ...cached,
+    can: (permission: Permission) => hasPermission(cached.user.role, permission),
   };
 }
 

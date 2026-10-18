@@ -85,7 +85,9 @@ export function TableHead({
   className,
   align = "left",
   ...props
-}: React.ThHTMLAttributes<HTMLTableCellElement> & { align?: "left" | "right" | "center" }) {
+}: Omit<React.ThHTMLAttributes<HTMLTableCellElement>, "align"> & {
+  align?: "left" | "right" | "center";
+}) {
   return (
     <th
       scope="col"
@@ -104,7 +106,9 @@ export function TableCell({
   className,
   align = "left",
   ...props
-}: React.TdHTMLAttributes<HTMLTableCellElement> & { align?: "left" | "right" | "center" }) {
+}: Omit<React.TdHTMLAttributes<HTMLTableCellElement>, "align"> & {
+  align?: "left" | "right" | "center";
+}) {
   return (
     <td
       className={cn(
@@ -185,7 +189,9 @@ export function SortableHead({
 export function MonoCell({
   className,
   ...props
-}: React.TdHTMLAttributes<HTMLTableCellElement>) {
+}: Omit<React.TdHTMLAttributes<HTMLTableCellElement>, "align"> & {
+  align?: "left" | "right" | "center";
+}) {
   return (
     <TableCell
       className={cn("font-mono text-[11px] text-foreground", className)}
